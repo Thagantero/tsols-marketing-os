@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en-KE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    (() => {
+      const { search, hash } = window.location;
+      const query = new URLSearchParams(search);
+      const fragment = new URLSearchParams(hash.slice(1));
+      const authFields = ['code', 'access_token', 'refresh_token', 'portal_token', 'token_hash', 'error', 'error_code', 'error_description'];
+      const legacyRoute = hash.startsWith('#/') || ['client', 'reset'].some(key => query.has(key)) ||
+        authFields.some(key => query.has(key) || fragment.has(key));
+      if (legacyRoute) {
+        const robots = document.createElement('meta');
+        robots.name = 'robots';
+        robots.content = 'noindex, nofollow';
+        document.head.append(robots);
+        window.location.replace('/app/' + search + hash);
+      }
+    })();
+  </script>
+  <title>TSOLS Marketing OS | Marketing Operations for Agencies</title>
+  <meta name="description" content="TSOLS Marketing OS brings content planning, social publishing, lead tracking, client reporting and billing into one workspace built by Thagana Solutions in Kenya.">
+  <meta name="theme-color" content="#10233f">
+  <link rel="canonical" href="https://os.tsols.co.ke/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="en_KE">
+  <meta property="og:site_name" content="TSOLS Marketing OS">
+  <meta property="og:title" content="TSOLS Marketing OS | Marketing Operations for Agencies">
+  <meta property="og:description" content="Plan content, track leads and share client reports from one marketing workspace built by Thagana Solutions in Kenya.">
+  <meta property="og:url" content="https://os.tsols.co.ke/">
+  <meta name="twitter:card" content="summary">
+  <link rel="stylesheet" href="/src/public-site.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://os.tsols.co.ke/#organization",
+        "name": "Thagana Solutions",
+        "url": "https://tsols.co.ke/",
+        "location": {"@type": "Place", "name": "Kiserian, Kenya"}
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://os.tsols.co.ke/#website",
+        "name": "TSOLS Marketing OS",
+        "url": "https://os.tsols.co.ke/",
+        "inLanguage": "en-KE",
+        "publisher": {"@id": "https://os.tsols.co.ke/#organization"}
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://os.tsols.co.ke/#application",
+        "name": "TSOLS Marketing OS",
+        "url": "https://os.tsols.co.ke/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web browser",
+        "description": "A marketing operations workspace built by Thagana Solutions for managing client content, publishing, leads, reporting and billing.",
+        "publisher": {"@id": "https://os.tsols.co.ke/#organization"}
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header shell">
+    <a class="brand" href="/" aria-label="TSOLS Marketing OS home"><span class="brand-mark" aria-hidden="true">T</span><span>TSOLS<small>MARKETING OS</small></span></a>
+    <nav aria-label="Main navigation">
+      <a href="#workflows">Workflows</a>
+      <a href="#questions">Questions</a>
+      <a class="button button-primary" href="/app/">Sign in <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="hero">
+      <div class="shell hero-inner">
+        <div class="hero-copy">
+          <h1>Run your marketing from one workspace<span>.</span></h1>
+          <p class="intro">Plan content, schedule social posts, track leads and share client reports with TSOLS Marketing OS.</p>
+          <a class="explore" href="#workflows">Explore the workspace <span aria-hidden="true">↓</span></a>
+        </div>
+        <aside class="workflow-preview" aria-label="Example content workflow">
+          <div class="preview-header"><span class="preview-brand" aria-hidden="true">T</span><strong>TSOLS Workspace</strong><span class="preview-label">Example workflow</span></div>
+          <div class="preview-body">
+            <h2>From draft to delivery</h2>
+            <ul class="preview-list">
+              <li><span class="preview-icon" aria-hidden="true">✓</span><strong>Draft social content</strong><span class="preview-state">Approved</span></li>
+              <li><span class="preview-icon" aria-hidden="true">→</span><strong>Schedule with Buffer</strong><span class="preview-state">Queued</span></li>
+              <li><span class="preview-icon" aria-hidden="true">↗</span><strong>Share the client report</strong><span class="preview-state">Ready</span></li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </section>
+    <section class="shell section" id="workflows">
+      <h2>What you can manage</h2>
+      <div class="feature-grid">
+        <article><h3>Content and publishing</h3><p>Create drafts, attach media, and plan posts on the calendar. Publish through connected Buffer accounts.</p></article>
+        <article><h3>Leads and advertising</h3><p>Review lead status and follow-ups, plan campaign budgets, and review imported Meta Ads and Google Ads results.</p></article>
+        <article><h3>Reports and billing</h3><p>Prepare weekly and monthly client reports, download approved reports as PDFs, and track service fees and operating costs in Kenyan shillings.</p></article>
+      </div>
+    </section>
+    <section class="questions" id="questions">
+      <div class="shell section question-layout">
+        <div><p class="eyebrow">Client portal</p><h2>Common questions</h2></div>
+        <div class="answers">
+          <article><h3>What can clients see?</h3><p>Authorized clients can view their own content, calendar, leads, advertising, approved reports, business profile and package.</p></article>
+          <article><h3>Do clients need a ChatGPT account?</h3><p>No. Select Sign in and use your TSOLS account. You’ll go straight to your client portal.</p></article>
+          <article><h3>How do I get access to the client portal?</h3><p>Ask your Thagana Solutions administrator for a client invitation, then sign in using the invited email address.</p></article>
+          <article><h3>Which time zone does TSOLS Marketing OS use?</h3><p>The workspace uses East Africa Time (Africa/Nairobi) for its calendar and reporting workflows.</p></article>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="shell footer"><p class="footer-brand">TSOLS Marketing OS</p><p>Developed By <a href="https://tsols.co.ke/?utm_source=tsols_marketing_os&amp;utm_medium=referral&amp;utm_content=homepage_footer">Thagana Solutions</a></p></footer>
+</body>
+</html>

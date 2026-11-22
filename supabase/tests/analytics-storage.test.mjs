@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+test('independent connection storage preserves other providers, legacy fallback and private grants',async()=>{
+ const db=new PGlite();
+ try{
+ await db.exec(`create role anon;create role authenticated;create role service_role;create schema tsols_private;create schema auth;create function auth.uid() returns uuid language sql as $$select null::uuid$$;
+ create table public.agencies(id uuid primary key);create table public.clients(id uuid primary key,agency_id uuid);create table public.agency_memberships(agency_id uuid,user_id uuid,role text);
+ create schema vault;create table vault.decrypted_secrets(id uuid primary key default gen_random_uuid(),decrypted_secret text,name text);
+ create function vault.create_secret(value text,label text) returns uuid language plpgsql as $$declare result uuid;begin insert into vault.decrypted_secrets(decrypted_secret,name) values(value,label) returning id into result;return result;end$$;
+ create function vault.update_secret(target uuid,value text) returns void language sql as $$update vault.decrypted_secrets set decrypted_secret=value where id=target$$;
+ insert into public.clients values('10000000-0000-4000-8000-000000000001',null);`);
+ for(const file of ['20261119101707_website_analytics_connections.sql','20261120180212_independent_analytics_connections.sql','20261120181427_analytics_oauth_apps.sql','20261121185615_reusable_analytics_accounts.sql'])await db.exec(await readFile(new URL('../migrations/'+file,import.meta.url),'utf8'));
+ const id='10000000-0000-4000-8000-000000000001';
+ const save=async(provider,credential,configuration)=>db.query('select public.store_website_analytics_connection($1,$2,$3,$4)',[id,provider,credential,configuration]);
+ const read=async provider=>(await db.query('select public.read_website_analytics_credential($1,$2) as key',[id,provider])).rows[0].key;
+ await save('google',{client_email:'legacy',marker:'legacy'},{ga4_property_id:'111',search_console_property:'sc-domain:example.com'});
+ assert.equal((await read('ga4')).marker,'legacy');assert.equal((await read('search')).marker,'legacy');
+ await save('ga4',{client_email:'ga4-email',marker:'ga4-only'},{ga4_property_id:'222'});
+ await save('search',{client_email:'search-email',marker:'search-only'},{search_console_property:'sc-domain:other.example.com'});
+ await save('bing',{api_key:'fake-local-test'},{bing_site_url:'https://example.com/'});
+ assert.equal((await read('ga4')).marker,'ga4-only');assert.equal((await read('search')).marker,'search-only');
+ const config=(await db.query('select * from public.website_analytics_connections')).rows[0];
+ assert.equal(config.ga4_property_id,'222');assert.equal(config.search_console_property,'sc-domain:other.example.com');assert.equal(config.ga4_email,'ga4-email');assert.equal(config.search_email,'search-email');assert.ok(config.ga4_verified_at);assert.ok(config.search_verified_at);assert.ok(config.bing_verified_at);
+ const agency='20000000-0000-4000-8000-000000000001';await db.query('insert into public.agencies values($1)',[agency]);
+ await db.query('select public.store_analytics_oauth_app($1,$2,$3)',[agency,'google',{client_id:'google-id',client_secret:'local-only-secret',redirect_uri:'https://example.com/app/?analytics_oauth=1'}]);
+ await db.query('select public.store_analytics_oauth_app($1,$2,$3)',[agency,'bing',{client_id:'bing-id',client_secret:'local-only-bing',redirect_uri:'https://example.com/app/?analytics_oauth=1'}]);
+ assert.equal((await db.query('select public.read_analytics_oauth_app($1,$2) as app',[agency,'google'])).rows[0].app.client_id,'google-id');
+ const state='a'.repeat(64),user='30000000-0000-4000-8000-000000000001',wrong='30000000-0000-4000-8000-000000000002';
+ await db.query('select public.issue_analytics_oauth_state($1,$2,$3,$4)',[state,user,id,{service:'ga4',verifier:'private'}]);
+ assert.equal((await db.query('select public.consume_analytics_oauth_state($1,$2,$3) as state',[state,wrong,id])).rows[0].state,null);
+ assert.equal((await db.query('select public.consume_analytics_oauth_state($1,$2,$3) as state',[state,user,id])).rows[0].state.service,'ga4');
+ assert.equal((await db.query('select public.consume_analytics_oauth_state($1,$2,$3) as state',[state,user,id])).rows[0].state,null);
+ await db.query('select public.issue_analytics_oauth_state($1,$2,$3,$4)',[state,user,id,{}]);await db.exec("update tsols_private.analytics_oauth_states set expires_at=now()-interval '1 second'");
+ assert.equal((await db.query('select public.consume_analytics_oauth_state($1,$2,$3) as state',[state,user,id])).rows[0].state,null);
+ await save('ga4',{type:'oauth',refresh_token:'old',access_token:'first'},{ga4_property_id:'333'});
+ assert.equal((await db.query('select public.rotate_website_analytics_token($1,$2,$3,$4) as rotated',[id,'ga4','old',{refresh_token:'new',access_token:'new-access'}])).rows[0].rotated,true);
+ assert.equal((await db.query('select public.rotate_website_analytics_token($1,$2,$3,$4) as rotated',[id,'ga4','old',{refresh_token:'stale',access_token:'stale'}])).rows[0].rotated,false);
+ assert.equal((await read('ga4')).access_token,'new-access');assert.equal((await read('search')).marker,'search-only');
+ assert.equal((await db.query('select ga4_auth_method from public.website_analytics_connections')).rows[0].ga4_auth_method,'oauth');
+ await db.query('select public.store_analytics_oauth_grant($1,$2,$3,$4)',[agency,user,'google',{grant_id:'account-one',refresh_token:'refresh-one',access_token:'access-one'}]);
+ await db.query('select public.store_analytics_oauth_grant($1,$2,$3,$4)',[agency,user,'google',{grant_id:'account-two',refresh_token:'refresh-two',access_token:'access-two'}]);
+ const readGrant=async(userId,grantId)=>(await db.query('select public.read_analytics_oauth_grant($1,$2,$3,$4) as grant',[agency,userId,'google',grantId])).rows[0].grant;
+ assert.equal((await readGrant(user,'account-one')).access_token,'access-one');assert.equal((await readGrant(user,'account-two')).access_token,'access-two');assert.equal(await readGrant(wrong,'account-one'),null);
+ assert.equal((await db.query('select public.store_analytics_oauth_grant($1,$2,$3,$4,$5) as saved',[agency,user,'google',{grant_id:'account-one',refresh_token:'refresh-new',access_token:'updated'},'refresh-one'])).rows[0].saved,true);
+ assert.equal((await db.query('select public.store_analytics_oauth_grant($1,$2,$3,$4,$5) as saved',[agency,user,'google',{grant_id:'account-one',refresh_token:'stale'},'refresh-one'])).rows[0].saved,false);
+ assert.equal((await readGrant(user,'account-two')).access_token,'access-two');
+ for(const role of ['anon','authenticated'])for(const fn of ['public.read_analytics_oauth_grant(uuid,uuid,text,text)','public.store_analytics_oauth_grant(uuid,uuid,text,jsonb,text)'])assert.equal((await db.query("select has_function_privilege($1,$2,'EXECUTE') as allowed",[role,fn])).rows[0].allowed,false);
+ for(const role of ['anon','authenticated'])for(const fn of ['public.read_analytics_oauth_app(uuid,text)','public.store_analytics_oauth_app(uuid,text,jsonb)','public.issue_analytics_oauth_state(text,uuid,uuid,jsonb)','public.consume_analytics_oauth_state(text,uuid,uuid)','public.rotate_website_analytics_token(uuid,text,text,jsonb)'])assert.equal((await db.query("select has_function_privilege($1,$2,'EXECUTE') as allowed",[role,fn])).rows[0].allowed,false);
+ for(const role of ['anon','authenticated']){const access=(await db.query(`select has_function_privilege($1,'public.read_website_analytics_credential(uuid,text)','EXECUTE') as can_read,has_function_privilege($1,'public.store_website_analytics_connection(uuid,text,jsonb,jsonb)','EXECUTE') as can_write`,[role])).rows[0];assert.equal(access.can_read,false);assert.equal(access.can_write,false);}
+ }finally{await db.close();}
+});

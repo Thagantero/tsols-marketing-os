@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {contentLifecycle} from '../../src/content-lifecycle.ts';
+const row=(provider_status,revision=2,status='submitted')=>({provider_status,revision,status});
+const post=rows=>({revision:2,publishing_deliveries:rows});
+test('approval and a calendar date alone do not imply scheduling',()=>{assert.equal(contentLifecycle({...post([]),status:'approved'}).label,'Draft');assert.match(contentLifecycle({...post([]),scheduled_at:'2026-11-21'}).detail,/not queued/);});
+test('only current revision receipts determine lifecycle',()=>assert.equal(contentLifecycle(post([row('sent',1),row('scheduled',1)])).key,'draft'));
+test('Buffer confirmation distinguishes scheduled and published',()=>{assert.equal(contentLifecycle(post([row('scheduled')])).label,'Scheduled');assert.equal(contentLifecycle(post([row('sent')])).label,'Published');});
+test('mixed destinations retain scheduled state and show published progress',()=>{const result=contentLifecycle(post([row('sent'),row('scheduled')]));assert.equal(result.key,'scheduled');assert.match(result.detail,/1 published · 1 scheduled/);});
+test('partial failures are visible beside the lifecycle',()=>{const result=contentLifecycle(post([row('sent'),row('error')]));assert.equal(result.key,'published');assert.match(result.detail,/1 unconfirmed.*attention/);});
+test('unknown, cancelled and unconfirmed deliveries never count as published',()=>{for(const r of [row(null,2,'unknown'),row('cancelled'),row(null)])assert.equal(contentLifecycle(post([r])).key,'draft');});
